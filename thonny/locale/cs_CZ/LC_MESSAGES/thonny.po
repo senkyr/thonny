@@ -2401,3 +2401,72 @@ msgstr "Model %s už není k dispozici. Vyberte jiného poskytovatele v Nástroj
 #: thonny/plugins/aia
 msgid "The local model is preparing the answer..."
 msgstr "Lokální model připravuje odpověď..."
+
+msgid "Prepare a local AI model"
+msgstr "Příprava lokálního AI modelu"
+
+msgid "Downloads a model suited to your RAM and tests it twice. The target is at least 10 tokens/s in both tests. Downloads may use several GB. Speed can change with system load; smaller models may give less accurate answers."
+msgstr "Stáhne model vhodný pro velikost RAM a dvakrát ho otestuje. Cílem je alespoň 10 tokenů/s v obou testech. Stahování může zabrat několik GB. Rychlost se mění se zatížením počítače; menší modely mohou odpovídat méně přesně."
+
+msgid "Checking hardware…"
+msgstr "Zjišťuji hardware…"
+
+msgid "Use this model"
+msgstr "Použít tento model"
+
+msgid "%s · %.1f GB RAM · %.1f GB free disk space"
+msgstr "%s · %.1f GB RAM · %.1f GB volného místa na disku"
+
+msgid "%s: %.1f and %.1f tokens/s"
+msgstr "%s: %.1f a %.1f tokenů/s"
+
+msgid "%s could not be prepared: %s"
+msgstr "%s se nepodařilo připravit: %s"
+
+msgid "Ready: %s · %.1f tokens/s (slower test)"
+msgstr "Připraveno: %s · %.1f tokenů/s (pomalejší test)"
+
+msgid "Starting Ollama…"
+msgstr "Spouštím Ollamu…"
+
+msgid "Ollama is not installed. Install it from https://ollama.com/download and try again."
+msgstr "Ollama není nainstalovaná. Nainstalujte ji z https://ollama.com/download a zkuste to znovu."
+
+msgid "Ollama could not start. Start Ollama and try again."
+msgstr "Ollamu se nepodařilo spustit. Spusťte ji a zkuste to znovu."
+
+msgid "Measuring %s (%s/2)…"
+msgstr "Měřím %s (%s/2)…"
+
+msgid "Not enough RAM for the supported local models. Use a cloud provider."
+msgstr "Pro podporované lokální modely není dostatek RAM. Použijte cloudového poskytovatele."
+
+msgid "Not enough disk space to download the model."
+msgstr "Pro stažení modelu není dostatek místa na disku."
+
+msgid "Downloading %s (about %s GB)…"
+msgstr "Stahuji %s (přibližně %s GB)…"
+
+msgid "Model download did not finish."
+msgstr "Stahování modelu nebylo dokončeno."
+
+msgid "No tested model reached 10 tokens/s. Close other apps and try again, or use a cloud provider."
+msgstr "Žádný otestovaný model nedosáhl 10 tokenů/s. Zavřete ostatní aplikace a zkuste to znovu, nebo použijte cloudového poskytovatele."
+
+msgid "Local model (Ollama, automatic selection)"
+msgstr "Lokální model (Ollama, automatický výběr)"
+
+msgid "Install Ollama from the link below, then prepare a local model automatically."
+msgstr "Nainstalujte Ollamu z odkazu níže, potom automaticky připravte lokální model."
+
+msgid "Automatic setup will start Ollama and prepare a suitable model."
+msgstr "Automatická příprava spustí Ollamu a připraví vhodný model."
+
+msgid "Automatic setup checks RAM, downloads a suitable model and measures its speed."
+msgstr "Automatická příprava zjistí velikost RAM, stáhne vhodný model a změří jeho rychlost."
+
+msgid "The target is at least 10 tokens/s. Downloads may use several GB."
+msgstr "Cílem je alespoň 10 tokenů/s. Stahování může zabrat několik GB."
+
+msgid "Automatically prepare a model (≥10 tokens/s)"
+msgstr "Automaticky připravit model (≥10 tokenů/s)"

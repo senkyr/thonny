@@ -16,6 +16,7 @@ LOCAL_TIMEOUT = 300.0
 # How long Ollama keeps the model loaded after a request. Thonny AIA renews it while it
 # runs (thonny.plugins.aia.local_model), so the model stays loaded for the whole lesson.
 KEEP_ALIVE = "10m"
+LOCAL_CONTEXT = 4096
 
 # Loading gpt-oss:20b from disk took 35-55 s on CPU (2026-10-10)
 LOAD_TIMEOUT = 300.0
@@ -50,8 +51,9 @@ def think_setting(model: str) -> Union[bool, str]:
 class OllamaProvider(LLMProvider):
     """Provider for locally running Ollama models."""
 
-    def __init__(self, get_host=None):
+    def __init__(self, get_host=None, get_model=None):
         self._get_host = get_host
+        self._get_model = get_model
 
     def _client(self, timeout: float):
         import ollama
@@ -79,6 +81,7 @@ class OllamaProvider(LLMProvider):
             stream=True,
             think=think_setting(model),
             keep_alive=KEEP_ALIVE,
+            options={"num_ctx": LOCAL_CONTEXT},
         )
         try:
             for chunk in stream:
@@ -92,8 +95,15 @@ class OllamaProvider(LLMProvider):
 
     def preload(self, model: str) -> None:
         """Load the model into memory (or renew its keep_alive). Blocks - worker thread only."""
+        host = self._get_host() if self._get_host else None
+        if self._get_model and self._get_model() and host == "http://127.0.0.1:11434":
+            from thonny.plugins.aia.model_setup import ModelSetup
+
+            ModelSetup().ensure_server()
         # A request without a prompt only loads the model (Ollama API docs, "Load a model")
-        self._client(LOAD_TIMEOUT).generate(model=model, keep_alive=KEEP_ALIVE)
+        self._client(LOAD_TIMEOUT).generate(
+            model=model, keep_alive=KEEP_ALIVE, options={"num_ctx": LOCAL_CONTEXT}
+        )
 
     def is_loaded(self, model: str, timeout: float = LIST_TIMEOUT) -> bool:
         """Whether the model is in memory (/api/ps). Blocks - worker thread only."""
@@ -117,6 +127,10 @@ class OllamaProvider(LLMProvider):
         return "Ollama (local)"
 
     def get_default_model(self) -> str:
+        if self._get_model:
+            selected = self._get_model()
+            if selected:
+                return selected
         # gpt-oss:20b (13 GB, needs ~14 GB free RAM): the only small-enough local model
         # that gave correct code in all 6 test answers and readable Czech (2026-10-09/10).
         # Speed is a matter of the user's hardware: on CPU only (i7-8550U, Ryzen 5 1600)

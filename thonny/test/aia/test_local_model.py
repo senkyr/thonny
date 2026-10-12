@@ -36,6 +36,7 @@ def keeper(fake_thonny, monkeypatch):
 
     fake_thonny.after = lambda ms, func: ("timer", ms)
     fake_thonny.after_cancel = lambda timer: None
+
     # run the HTTP requests on the test thread
     def run(self, func, model, load=False):
         self._failed = False if load else self._failed
@@ -116,7 +117,12 @@ def test_preload_and_unload_requests(fake_thonny, monkeypatch):
     provider = OllamaProvider()
     provider.preload("gpt-oss:20b")
     provider.unload("gpt-oss:20b", timeout=2.0)
-    assert calls[0] == {"timeout": 300.0, "model": "gpt-oss:20b", "keep_alive": "10m"}
+    assert calls[0] == {
+        "timeout": 300.0,
+        "model": "gpt-oss:20b",
+        "keep_alive": "10m",
+        "options": {"num_ctx": 4096},
+    }
     assert calls[1] == {"timeout": 2.0, "model": "gpt-oss:20b", "keep_alive": 0}
 
 

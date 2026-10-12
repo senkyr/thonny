@@ -31,6 +31,8 @@ def load_plugin():
     wb.set_default("aia.include_local_imports", False)
     wb.set_default("aia.openai_api_base", "")
     wb.set_default("aia.ollama_host", "")
+    wb.set_default("aia.ollama_model", "")
+    wb.set_default("aia.ollama_benchmark_tps", 0.0)
 
     # Answer styles were renamed on 2026-10-10 (mentor -> socratic, balanced -> explanatory)
     stored = wb.get_option("aia.mentoring_level")

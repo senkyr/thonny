@@ -328,6 +328,7 @@ class AIACore:
 
             self._providers["ollama"] = OllamaProvider(
                 get_host=lambda: wb.get_option("aia.ollama_host") or None,
+                get_model=lambda: wb.get_option("aia.ollama_model") or None,
             )
 
         logger.debug("AIA providers available: %s", ", ".join(self._providers) or "none")

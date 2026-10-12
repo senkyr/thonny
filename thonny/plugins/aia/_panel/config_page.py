@@ -1,10 +1,8 @@
-"""Configuration page for AIA (Tools > Options > AI Assistant).
+"""AIA configuration with the same provider choices as the welcome dialog.
 
-The AI choice is the welcome dialog's choice (Jakub 2026-10-10: the options had other items
-than the dialog and a model choice that was quietly dropped): the same list in the same
-order, the same notes, the API key on the page. Each provider answers with its default
-model, so there is no model choice. The Claude Code demo provider is not offered (Jakub
-2026-10-10: "To demo tam nemá co dělat."): it is reachable only by editing configuration.ini.
+Cloud providers use their defaults. Ollama offers the shared hardware-aware
+setup and keeps its measured model selection. The Claude Code demo provider
+remains accessible only through configuration.ini.
 """
 
 import tkinter as tk
@@ -26,10 +24,13 @@ def style_names():
 
 
 def _cloud_note(provider):
-    return tr(
-        "Answers come from %s. You need an API key: create it at the link below, or get one "
-        "from your teacher."
-    ) % first_run.COMPANY[provider]
+    return (
+        tr(
+            "Answers come from %s. You need an API key: create it at the link below, or get one "
+            "from your teacher."
+        )
+        % first_run.COMPANY[provider]
+    )
 
 
 def _later_note():
@@ -44,6 +45,10 @@ class AIAPanelConfigPage(ConfigurationPage):
         wb = get_workbench()
 
         self._models = first_run._default_models()
+        self._models[first_run.AI_LOCAL] = (
+            wb.get_option("aia.ollama_model") or self._models[first_run.AI_LOCAL]
+        )
+        self._local_selection = None
         self._key_urls = first_run._key_urls()
         self._labels = first_run._ai_labels(self._models)
 
@@ -161,7 +166,11 @@ class AIAPanelConfigPage(ConfigurationPage):
             text=tr("The key is stored in plain text in Thonny's configuration file."),
             foreground="#7f8c8d",
         ).grid(row=2, column=1, columnspan=2, sticky="w", pady=(2, 0))
-        d.check_button = ttk.Button(frame, text=tr("Check again"), command=self._on_check_ollama)
+        d.check_button = ttk.Button(
+            frame,
+            text=tr("Automatically prepare a model (≥10 tokens/s)"),
+            command=self._on_check_ollama,
+        )
         d.check_button.grid(row=2, column=1, sticky="nw", pady=(7, 0))
         d.link = ui_utils.create_action_label(frame, "", lambda e: webbrowser.open(self._link_url))
         d.link.grid(row=3, column=1, sticky="nw", pady=(3, 0))
@@ -179,10 +188,7 @@ class AIAPanelConfigPage(ConfigurationPage):
         elif ai == first_run.AI_LOCAL:
             d.note.configure(text=first_run._local_note(ollama, self._models[ai]))
             d.key_frame.grid_remove()
-            if ollama == "ready":
-                d.check_button.grid_remove()
-            else:
-                d.check_button.grid()
+            d.check_button.grid()
             link = first_run.OLLAMA_URL if ollama in ("missing", "stopped") else ""
         else:
             d.note.configure(text=_later_note())
@@ -231,6 +237,13 @@ class AIAPanelConfigPage(ConfigurationPage):
         self._show(self._ai)
 
     def _on_check_ollama(self):
+        from thonny.plugins.aia.model_setup_ui import ModelSetupDialog
+
+        dialog = ModelSetupDialog(self)
+        dialog.show_modal()
+        if dialog.result is not None:
+            self._local_selection = dialog.result
+            self._models[first_run.AI_LOCAL] = dialog.result.model
         self._ollama = first_run.ollama_state(self._models[first_run.AI_LOCAL])
         self._fill(first_run.AI_LOCAL, self._ollama)
 
@@ -243,6 +256,14 @@ class AIAPanelConfigPage(ConfigurationPage):
     def apply(self, changed_options=None):
         # 4.x/5.0 call apply() without arguments, newer Thonny passes changed_options
         wb = get_workbench()
+        if (
+            self._ai == first_run.AI_LOCAL
+            and self._local_selection is None
+            and not wb.get_option("aia.ollama_model")
+        ):
+            self._on_check_ollama()
+            if self._local_selection is None:
+                return False
         if self._ai in first_run.AI_CLOUD:
             self._keys[self._ai] = self._key_var.get()
         for provider, key in self._keys.items():
@@ -251,4 +272,8 @@ class AIAPanelConfigPage(ConfigurationPage):
         if self._kept_provider is None:
             wb.set_option("aia.provider", "" if self._ai == first_run.AI_LATER else self._ai)
         wb.set_option("aia.model", "")  # a model chosen in earlier versions no longer applies
+        if self._ai == first_run.AI_LOCAL and self._local_selection:
+            wb.set_option("aia.ollama_model", self._local_selection.model)
+            wb.set_option("aia.ollama_benchmark_tps", self._local_selection.tokens_per_second)
+            wb.set_option("aia.ollama_host", "http://127.0.0.1:11434")
         return True

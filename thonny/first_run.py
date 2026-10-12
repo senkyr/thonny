@@ -1,6 +1,5 @@
 import json
 import os.path
-import shutil
 import tkinter as tk
 import types
 import urllib.request
@@ -55,9 +54,9 @@ def _key_urls():
 def ollama_state(model):
     """'missing' (not installed), 'stopped' (installed, server not answering),
     'no_model' (running, model not downloaded) or 'ready'."""
-    exe = shutil.which("ollama") or os.path.exists(
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe")
-    )
+    from thonny.plugins.aia.model_setup import find_ollama
+
+    exe = find_ollama()
     # no proxy: a school proxy from the Windows registry answers 127.0.0.1 with 503
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
@@ -86,7 +85,7 @@ MODEL_NAMES = {
 
 def _ai_labels(models):
     # Order of the choice (Jakub 2026-10-10): local model first, providers by company name, "later" last
-    labels = {AI_LOCAL: tr("Local model (Ollama, %s)") % models[AI_LOCAL]}
+    labels = {AI_LOCAL: tr("Local model (Ollama, automatic selection)")}
     for p in sorted(AI_CLOUD, key=lambda p: COMPANY[p].lower()):
         labels[p] = "%s (%s)" % (COMPANY[p], MODEL_NAMES.get(models[p], models[p]))
     labels[AI_LATER] = tr("I will set it up later")
@@ -94,34 +93,25 @@ def _ai_labels(models):
 
 
 def _cloud_note(provider):
-    return tr(
-        "Answers come from %s. You need an API key: create it at the link below, or get one "
-        "from your teacher. You can also enter it later in Tools > Options > AI Assistant."
-    ) % COMPANY[provider]
+    return (
+        tr(
+            "Answers come from %s. You need an API key: create it at the link below, or get one "
+            "from your teacher. You can also enter it later in Tools > Options > AI Assistant."
+        )
+        % COMPANY[provider]
+    )
 
 
 def _local_note(state, model):
-    # Kept about as long as the cloud note (Jakub 2026-10-10): the detail area is sized for the
-    # longest variant, so a long local note left the usual dialog half empty.
     if state == "missing":
-        text = tr(
-            "Ollama is not installed. Install it from the link below, then download the model: "
-            "'ollama pull %s' (13 GB)."
-        ) % model
+        text = tr("Install Ollama from the link below, then prepare a local model automatically.")
     elif state == "stopped":
-        text = tr("Ollama is installed but not running. Start it.")
-    elif state == "no_model":
-        text = tr("Ollama is running, but the model is missing. Download it: 'ollama pull %s' (13 GB).") % model
-    else:
+        text = tr("Automatic setup will start Ollama and prepare a suitable model.")
+    elif state == "ready":
         text = tr("Ollama is running and the model %s is ready.") % model
-    return (
-        text
-        + " "
-        + tr(
-            "It runs offline, needs about 14 GB of free RAM and, without a strong graphics card, "
-            "answers in 20-70 s."
-        )
-    )
+    else:
+        text = tr("Automatic setup checks RAM, downloads a suitable model and measures its speed.")
+    return text + " " + tr("The target is at least 10 tokens/s. Downloads may use several GB.")
 
 
 def _later_note():
@@ -141,6 +131,7 @@ class FirstRunWindow(tk.Tk):
 
         self.conf = configuration_manager
         self.models = _default_models()
+        self._local_selection = None
         self.key_urls = _key_urls()
         # last ollama_state(); checked right away, because the local model is preselected
         self.ollama = ollama_state(self.models[AI_LOCAL]) if AI_DEFAULT == AI_LOCAL else None
@@ -158,7 +149,9 @@ class FirstRunWindow(tk.Tk):
         self.iconphoto(True, self.logo)  # not the Tk feather in the title bar
 
         logo_label = ttk.Label(self.main_frame, image=self.logo)
-        logo_label.grid(row=1, rowspan=4, column=1, sticky="n", pady=(7, 0))  # top level with the first choice
+        logo_label.grid(
+            row=1, rowspan=4, column=1, sticky="n", pady=(7, 0)
+        )  # top level with the first choice
 
         self.padx = 50
         self.pady = 50
@@ -203,18 +196,14 @@ class FirstRunWindow(tk.Tk):
         self._sized_for = None  # language the detail size was measured for
 
         self.ok_button = ttk.Button(self.main_frame, command=self.on_ok)
-        self.ok_button.grid(
-            row=5, column=3, padx=(0, self.padx), pady=(12, 20), sticky="se"
-        )
+        self.ok_button.grid(row=5, column=3, padx=(0, self.padx), pady=(12, 20), sticky="se")
         self._translatable.append((self.ok_button, lambda: tr("Let's go!")))
 
         self._retranslate()
         self.center()
 
     def on_change_language(self):
-        languages.set_language(
-            languages.get_language_code_by_name(self.language_variable.get())
-        )
+        languages.set_language(languages.get_language_code_by_name(self.language_variable.get()))
         self._retranslate()
 
     def on_change_mode(self, event=None):
@@ -230,6 +219,13 @@ class FirstRunWindow(tk.Tk):
         self._show_detail(self.detail, self.ai, self.ollama)
 
     def on_check_ollama(self):
+        from thonny.plugins.aia.model_setup_ui import ModelSetupDialog
+
+        dialog = ModelSetupDialog(self)
+        dialog.show_modal()
+        if dialog.result is not None:
+            self._local_selection = dialog.result
+            self.models[AI_LOCAL] = dialog.result.model
         self.ollama = ollama_state(self.models[AI_LOCAL])
         self._show_detail(self.detail, self.ai, self.ollama)
 
@@ -280,7 +276,7 @@ class FirstRunWindow(tk.Tk):
     def _show_detail(self, d, ai, ollama):
         """Fill a detail area for one AI choice (and one Ollama state for the local model)."""
         d.key_label.configure(text=tr("API key:"))
-        d.check_button.configure(text=tr("Check again"))
+        d.check_button.configure(text=tr("Automatically prepare a model (≥10 tokens/s)"))
         if ai in AI_CLOUD:
             d.note.configure(text=_cloud_note(ai))
             d.key_frame.grid()
@@ -289,10 +285,7 @@ class FirstRunWindow(tk.Tk):
         elif ai == AI_LOCAL:
             d.note.configure(text=_local_note(ollama, self.models[AI_LOCAL]))
             d.key_frame.grid_remove()
-            if ollama == "ready":
-                d.check_button.grid_remove()
-            else:
-                d.check_button.grid()
+            d.check_button.grid()
             link = OLLAMA_URL if ollama in ("missing", "stopped") else ""
         else:
             d.note.configure(text=_later_note())
@@ -315,7 +308,11 @@ class FirstRunWindow(tk.Tk):
         # the note uses the full width of the choices above it (labels + combos), not a fixed
         # 400 px: fewer lines, so the area reserved for the longest variant is lower
         self.update_idletasks()
-        wrap = max(l.winfo_reqwidth() for l in self._combo_labels) + 10 + self.ai_combo.winfo_reqwidth()
+        wrap = (
+            max(l.winfo_reqwidth() for l in self._combo_labels)
+            + 10
+            + self.ai_combo.winfo_reqwidth()
+        )
         for d in (self.detail, self.probe):
             d.note.configure(wraplength=wrap)
         width = height = 0
@@ -366,6 +363,10 @@ class FirstRunWindow(tk.Tk):
         self.geometry("+{}+{}".format(left, top))
 
     def on_ok(self):
+        if self.ai == AI_LOCAL and self._local_selection is None:
+            self.on_check_ollama()
+            if self._local_selection is None:
+                return
         if self.mode == RPI_MODE:
             self.conf.set_option("debugger.preferred_debugger", "faster")
             self.conf.set_option("view.ui_theme", "Raspberry Pi")
@@ -376,6 +377,12 @@ class FirstRunWindow(tk.Tk):
         )
 
         self.conf.set_option("aia.enabled", True)
+        if self.ai == AI_LOCAL and self._local_selection:
+            self.conf.set_option("aia.ollama_model", self._local_selection.model)
+            self.conf.set_option(
+                "aia.ollama_benchmark_tps", self._local_selection.tokens_per_second
+            )
+            self.conf.set_option("aia.ollama_host", "http://127.0.0.1:11434")
         if self.ai != AI_LATER:  # "later" saves no provider: the AIA panel asks for the choice
             self.conf.set_option("aia.provider", self.ai)
             key = self.key_variable.get().strip()
